@@ -13,10 +13,34 @@ workflows:
         distribution_type: development
         bundle_identifier: com.muxuefeng.gpsiphone
     scripts:
+      - name: Generate iOS project
+        script: |
+          # 备份自定义文件
+          cp ios/Runner/Info.plist /tmp/Info.plist.bak
+          cp ios/Podfile /tmp/Podfile.bak
+          cp ios/Runner/AppDelegate.swift /tmp/AppDelegate.swift.bak
+          cp ios/Runner/Base.lproj/LaunchScreen.storyboard /tmp/LaunchScreen.storyboard.bak
+          cp ios/Runner/Base.lproj/Main.storyboard /tmp/Main.storyboard.bak
+          cp ios/Flutter/AppFrameworkInfo.plist /tmp/AppFrameworkInfo.plist.bak
+          cp ios/exportOptions.plist /tmp/exportOptions.plist.bak
+
+          # 生成 Xcode 项目
+          flutter create . --platforms ios --no-pub
+
+          # 恢复自定义文件
+          cp /tmp/Info.plist.bak ios/Runner/Info.plist
+          cp /tmp/Podfile.bak ios/Podfile
+          cp /tmp/AppDelegate.swift.bak ios/Runner/AppDelegate.swift
+          cp /tmp/LaunchScreen.storyboard.bak ios/Runner/Base.lproj/LaunchScreen.storyboard
+          cp /tmp/Main.storyboard.bak ios/Runner/Base.lproj/Main.storyboard
+          cp /tmp/AppFrameworkInfo.plist.bak ios/Flutter/AppFrameworkInfo.plist
+          cp /tmp/exportOptions.plist.bak ios/exportOptions.plist
+
       - name: Install dependencies
         script: |
           flutter pub get
           cd ios && pod install && cd ..
+
       - name: Build iOS
         script: flutter build ipa --release --export-options-plist ios/exportOptions.plist
     artifacts:
