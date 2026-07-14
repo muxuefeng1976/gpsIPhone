@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -42,12 +43,14 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
   bool _isTracking = false;
   String _status = '就绪，等待开始';
   String _deviceId = 'unknown';
+  String _platform = 'unknown';
+  String _model = 'unknown';
   Position? _lastPosition;
   StreamSubscription<Position>? _positionStream;
   int _uploadCount = 0;
   int _failCount = 0;
 
-  // 上传间隔（秒），iPhone 6s 性能较低，适当增加间隔
+  // 上传间隔（秒）
   Duration _uploadInterval = const Duration(seconds: 5);
   DateTime? _lastUploadTime;
 
@@ -60,10 +63,20 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
   Future<void> _getDeviceId() async {
     try {
       final deviceInfo = DeviceInfoPlugin();
-      final iosInfo = await deviceInfo.iosInfo;
-      setState(() {
-        _deviceId = iosInfo.identifierForVendor ?? 'unknown';
-      });
+      if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        _deviceId = iosInfo.identifierForVendor ?? 'ios_unknown';
+        _platform = 'ios';
+        _model = iosInfo.model;
+      } else if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        _deviceId = androidInfo.id;
+        _platform = 'android';
+        _model = '${androidInfo.brand} ${androidInfo.model}';
+      } else {
+        _deviceId = 'unknown_${DateTime.now().millisecondsSinceEpoch}';
+      }
+      setState(() {});
     } catch (e) {
       _deviceId = 'flutter_${DateTime.now().millisecondsSinceEpoch}';
     }
@@ -181,8 +194,8 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
         'heading': position.heading,
         'timestamp': position.timestamp?.toIso8601String() ??
             DateTime.now().toIso8601String(),
-        'platform': 'ios',
-        'model': 'iPhone 6s',
+        'platform': _platform,
+        'model': _model,
       };
 
       final response = await http
