@@ -1,0 +1,50 @@
+platform :ios, '12.0'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'AppFrameworkInfo.plist'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'ephemeral', 'AppFrameworkInfo.plist'), __FILE__)
+  end
+  unless File.exist?(generated_xcode_build_settings_path)
+    generated_xcode_build_settings_path = File.expand_path(File.join('..', '..', '..', 'flutter', 'packages', 'flutter_tools', 'templates', 'app', 'ios', 'Flutter', 'AppFrameworkInfo.plist'), __FILE__)
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'xcode_backend'), flutter_root)
+
+pod 'Flutter'
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+
+    # iPhone 6s 兼容性：设置最低部署目标为 iOS 12.0
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+
+      # 排除 armv7 架构（Xcode 14+ 不支持），仅保留 arm64
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'i386'
+      config.build_settings['ARCHS'] = 'arm64'
+
+      # 允许非安全 HTTP
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+        '$(inherited)'
+      ]
+    end
+  end
+end
