@@ -1,5 +1,5 @@
-# Codemagic iOS 构建配置 - iPhone 6s (iOS 15.8.8)
-# 用免费 Apple ID 签名，不需要付费开发者账号
+# Codemagic 构建配置 - iPhone 6s (iOS 15.8)
+# 构建未签名 IPA，用 Sideloadly 签名安装
 
 workflows:
   ios-build:
@@ -9,16 +9,11 @@ workflows:
     environment:
       flutter: stable
       xcode: 15.4
-      ios_signing:
-        distribution_type: development
-        bundle_identifier: com.muxuefeng.gpsiphone
     scripts:
       - name: Generate iOS project
         script: |
           set -e
           mkdir -p /tmp/ios_bak
-
-          # 备份自定义文件
           cp ios/Runner/Info.plist /tmp/ios_bak/Info.plist.bak
           cp ios/Podfile /tmp/ios_bak/Podfile.bak
           cp ios/Runner/AppDelegate.swift /tmp/ios_bak/AppDelegate.swift.bak
@@ -27,13 +22,9 @@ workflows:
           cp ios/Flutter/AppFrameworkInfo.plist /tmp/ios_bak/AppFrameworkInfo.plist.bak
           cp ios/exportOptions.plist /tmp/ios_bak/exportOptions.plist.bak
 
-          # 必须删除旧目录，flutter create 在目录存在时会跳过
           rm -rf ios
-
-          # 重新生成 Xcode 项目
           flutter create . --platforms ios --no-pub
 
-          # 恢复自定义文件
           cp /tmp/ios_bak/Info.plist.bak ios/Runner/Info.plist
           cp /tmp/ios_bak/Podfile.bak ios/Podfile
           cp /tmp/ios_bak/AppDelegate.swift.bak ios/Runner/AppDelegate.swift
@@ -47,11 +38,14 @@ workflows:
           flutter pub get
           cd ios && pod install && cd ..
 
-      - name: Build iOS
-        script: flutter build ipa --release --export-options-plist ios/exportOptions.plist
+      - name: Build IPA (unsigned)
+        script: |
+          flutter build ios --release --no-codesign
+          mkdir -p build/ios/ipa
+          mkdir Payload
+          cp -r build/ios/Release-iphoneos/Runner.app Payload/
+          zip -r build/ios/ipa/gps_iphone.ipa Payload
+          rm -rf Payload
+
     artifacts:
-      - build/ios/ipa/*.ipa
-    publishing:
-      email:
-        recipients:
-          - your-email@example.com
+      - build/ios/ipa/gps_iphone.ipa
