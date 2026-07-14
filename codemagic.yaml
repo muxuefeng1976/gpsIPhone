@@ -15,26 +15,32 @@ workflows:
     scripts:
       - name: Generate iOS project
         script: |
-          # 备份自定义文件
-          cp ios/Runner/Info.plist /tmp/Info.plist.bak
-          cp ios/Podfile /tmp/Podfile.bak
-          cp ios/Runner/AppDelegate.swift /tmp/AppDelegate.swift.bak
-          cp ios/Runner/Base.lproj/LaunchScreen.storyboard /tmp/LaunchScreen.storyboard.bak
-          cp ios/Runner/Base.lproj/Main.storyboard /tmp/Main.storyboard.bak
-          cp ios/Flutter/AppFrameworkInfo.plist /tmp/AppFrameworkInfo.plist.bak
-          cp ios/exportOptions.plist /tmp/exportOptions.plist.bak
+          set -e
+          mkdir -p /tmp/ios_bak
 
-          # 生成 Xcode 项目
+          # 备份自定义文件
+          cp ios/Runner/Info.plist /tmp/ios_bak/Info.plist.bak
+          cp ios/Podfile /tmp/ios_bak/Podfile.bak
+          cp ios/Runner/AppDelegate.swift /tmp/ios_bak/AppDelegate.swift.bak
+          cp ios/Runner/Base.lproj/LaunchScreen.storyboard /tmp/ios_bak/LaunchScreen.storyboard.bak
+          cp ios/Runner/Base.lproj/Main.storyboard /tmp/ios_bak/Main.storyboard.bak
+          cp ios/Flutter/AppFrameworkInfo.plist /tmp/ios_bak/AppFrameworkInfo.plist.bak
+          cp ios/exportOptions.plist /tmp/ios_bak/exportOptions.plist.bak
+
+          # 必须删除旧目录，flutter create 在目录存在时会跳过
+          rm -rf ios
+
+          # 重新生成 Xcode 项目
           flutter create . --platforms ios --no-pub
 
           # 恢复自定义文件
-          cp /tmp/Info.plist.bak ios/Runner/Info.plist
-          cp /tmp/Podfile.bak ios/Podfile
-          cp /tmp/AppDelegate.swift.bak ios/Runner/AppDelegate.swift
-          cp /tmp/LaunchScreen.storyboard.bak ios/Runner/Base.lproj/LaunchScreen.storyboard
-          cp /tmp/Main.storyboard.bak ios/Runner/Base.lproj/Main.storyboard
-          cp /tmp/AppFrameworkInfo.plist.bak ios/Flutter/AppFrameworkInfo.plist
-          cp /tmp/exportOptions.plist.bak ios/exportOptions.plist
+          cp /tmp/ios_bak/Info.plist.bak ios/Runner/Info.plist
+          cp /tmp/ios_bak/Podfile.bak ios/Podfile
+          cp /tmp/ios_bak/AppDelegate.swift.bak ios/Runner/AppDelegate.swift
+          cp /tmp/ios_bak/LaunchScreen.storyboard.bak ios/Runner/Base.lproj/LaunchScreen.storyboard
+          cp /tmp/ios_bak/Main.storyboard.bak ios/Runner/Base.lproj/Main.storyboard
+          cp /tmp/ios_bak/AppFrameworkInfo.plist.bak ios/Flutter/AppFrameworkInfo.plist
+          cp /tmp/ios_bak/exportOptions.plist.bak ios/exportOptions.plist
 
       - name: Install dependencies
         script: |
