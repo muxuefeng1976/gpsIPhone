@@ -198,7 +198,7 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(body),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 5));
 
       setState(() {
         _uploadCount++;
