@@ -184,18 +184,12 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
   Future<void> _uploadPosition(Position position) async {
     try {
       final body = {
-        'device_id': _deviceId,
-        'latitude': position.latitude,
-        'longitude': position.longitude,
-        'altitude': position.altitude,
-        'accuracy': position.accuracy,
-        'speed': position.speed,
-        'speed_accuracy': position.speedAccuracy,
-        'heading': position.heading,
-        'timestamp': position.timestamp?.toIso8601String() ??
-            DateTime.now().toIso8601String(),
-        'platform': _platform,
-        'model': _model,
+        'ID': _deviceId,
+        'Time': DateTime.now().millisecondsSinceEpoch.toString(),
+        'Lat': position.latitude.toStringAsFixed(8),
+        'Lon': position.longitude.toStringAsFixed(8),
+        'Alt': ' ${position.altitude.toStringAsFixed(0)}',
+        'Speed': '${position.speed.toStringAsFixed(2)} m/s ',
       };
 
       final response = await http
