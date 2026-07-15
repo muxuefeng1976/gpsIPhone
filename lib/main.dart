@@ -58,6 +58,7 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
   void initState() {
     super.initState();
     _getDeviceId();
+    _getInitialPosition();
   }
 
   Future<void> _getDeviceId() async {
@@ -106,6 +107,24 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
   void dispose() {
     _stopTracking();
     super.dispose();
+  }
+
+  /// 静默获取一次当前位置（已有权限时），不弹权限对话框
+  Future<void> _getInitialPosition() async {
+    try {
+      final status = await Permission.location.status;
+      if (status.isGranted || status.isLimited) {
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        );
+        _lastPosition = pos;
+        setState(() {});
+      }
+    } catch (_) {
+      // 静默失败，不影响用户体验
+    }
   }
 
   Future<bool> _requestPermissions() async {
@@ -169,6 +188,19 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
       _failCount = 0;
       _lastUploadTime = null;
     });
+
+    // 先获取一次当前位置，让经纬度立刻显示（不等待流推送）
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+        ),
+      );
+      _lastPosition = pos;
+      setState(() {});
+    } catch (_) {
+      // 获取失败不影响后续流
+    }
 
     // 定位设置：高精度，每5秒更新一次，最小位移0米（每次都更新）
     const locationSettings = LocationSettings(
