@@ -22,6 +22,9 @@ dependencies:
   # 设备信息
   device_info_plus: ^9.1.2
 
+  # 本地存储（持久化设备ID）
+  shared_preferences: ^2.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

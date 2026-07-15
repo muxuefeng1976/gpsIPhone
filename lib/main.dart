@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,23 +62,43 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
 
   Future<void> _getDeviceId() async {
     try {
-      final deviceInfo = DeviceInfoPlugin();
-      if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        _deviceId = iosInfo.identifierForVendor ?? 'ios_unknown';
-        _platform = 'ios';
-        _model = iosInfo.model;
-      } else if (Platform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
-        _deviceId = androidInfo.id;
-        _platform = 'android';
-        _model = '${androidInfo.brand} ${androidInfo.model}';
+      final prefs = await SharedPreferences.getInstance();
+
+      // 从本地存储读取或生成持久化 UUID
+      String? storedId = prefs.getString('device_uuid');
+      if (storedId != null && storedId.isNotEmpty) {
+        _deviceId = storedId;
       } else {
-        _deviceId = 'unknown_${DateTime.now().millisecondsSinceEpoch}';
+        // 首次使用：生成 UUID 并保存
+        final now = DateTime.now().millisecondsSinceEpoch;
+        _deviceId = 'ios_${now.toRadixString(36)}';
+        await prefs.setString('device_uuid', _deviceId);
       }
+
+      // 尝试获取设备型号（非关键，失败不影响）
+      try {
+        final deviceInfo = DeviceInfoPlugin();
+        if (Platform.isIOS) {
+          final iosInfo = await deviceInfo.iosInfo;
+          _platform = 'ios';
+          _model = iosInfo.model;
+        } else if (Platform.isAndroid) {
+          final androidInfo = await deviceInfo.androidInfo;
+          _platform = 'android';
+          _model = '${androidInfo.brand} ${androidInfo.model}';
+        }
+      } catch (_) {
+        _platform = 'ios';
+        _model = 'iPhone';
+      }
+
       setState(() {});
     } catch (e) {
-      _deviceId = 'flutter_${DateTime.now().millisecondsSinceEpoch}';
+      // 最后的 fallback
+      _deviceId = 'ios_${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
+      _platform = 'ios';
+      _model = 'iPhone';
+      setState(() {});
     }
   }
 
@@ -304,25 +324,54 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
                           TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const Divider(),
-                    _buildGPSRow('纬度 (Latitude)',
-                        _lastPosition?.latitude.toStringAsFixed(6) ?? '--'),
-                    _buildGPSRow('经度 (Longitude)',
-                        _lastPosition?.longitude.toStringAsFixed(6) ?? '--'),
-                    _buildGPSRow(
-                        '海拔 (Altitude)', '${_lastPosition?.altitude.toStringAsFixed(1) ?? '--'} m'),
-                    _buildGPSRow('精度 (Accuracy)',
-                        '${_lastPosition?.accuracy.toStringAsFixed(1) ?? '--'} m'),
-                    _buildGPSRow('速度 (Speed)',
-                        _formatSpeed(_lastPosition?.speed)),
-                    _buildGPSRow('方向 (Heading)',
-                        _lastPosition?.heading?.toStringAsFixed(1) ?? '--'),
-                    _buildGPSRow(
-                        '定位时间',
-                        _lastPosition?.timestamp
-                                ?.toLocal()
-                                .toString()
-                                .substring(0, 19) ??
-                            '--'),
+                    if (_lastPosition == null && !_isTracking)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Center(
+                          child: Text('点击"开始追踪"获取 GPS 数据',
+                              style: TextStyle(
+                                  fontSize: 14, color: Colors.grey)),
+                        ),
+                      )
+                    else if (_lastPosition == null && _isTracking)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              CircularProgressIndicator(strokeWidth: 2),
+                              SizedBox(height: 12),
+                              Text('正在获取 GPS 定位，请稍候...',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey)),
+                              SizedBox(height: 4),
+                              Text('请确保已授权定位权限，并在户外测试',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                      )
+                    else ...[
+                      _buildGPSRow('纬度 (Latitude)',
+                          _lastPosition!.latitude.toStringAsFixed(6)),
+                      _buildGPSRow('经度 (Longitude)',
+                          _lastPosition!.longitude.toStringAsFixed(6)),
+                      _buildGPSRow('海拔 (Altitude)',
+                          '${_lastPosition!.altitude.toStringAsFixed(1)} m'),
+                      _buildGPSRow('精度 (Accuracy)',
+                          '${_lastPosition!.accuracy.toStringAsFixed(1)} m'),
+                      _buildGPSRow('速度 (Speed)',
+                          _formatSpeed(_lastPosition!.speed)),
+                      _buildGPSRow('方向 (Heading)',
+                          _lastPosition!.heading?.toStringAsFixed(1) ?? '--'),
+                      _buildGPSRow(
+                          '定位时间',
+                          _lastPosition!.timestamp
+                              .toLocal()
+                              .toString()
+                              .substring(0, 19)),
+                    ],
                   ],
                 ),
               ),
