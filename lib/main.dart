@@ -128,24 +128,17 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
     // 先拿一次当前位置，立刻显示
     try {
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-        ),
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
       );
       _lastPosition = pos;
       setState(() => _status = '就绪，等待上传');
     } catch (_) {}
 
     // 启动位置流，持续更新
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
+    _positionStream = Geolocator.getPositionStream(
+      desiredAccuracy: LocationAccuracy.bestForNavigation,
       distanceFilter: 0,
-      timeLimit: null,
-    );
-
-    _positionStream =
-        Geolocator.getPositionStream(locationSettings: locationSettings)
-            .listen(
+    ).listen(
       (Position position) {
         _lastPosition = position;
         // 如果开启了追踪，才上传
