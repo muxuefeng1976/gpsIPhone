@@ -29,14 +29,12 @@ workflows:
           cp /tmp/ios_bak/exportOptions.plist ios/exportOptions.plist
 
           # 通过 xcconfig 关闭代码签名（--no-codesign 构建未签名 IPA）
-          cat >> ios/Flutter/Release.xcconfig << 'EOF'
-CODE_SIGN_STYLE = Manual
-DEVELOPMENT_TEAM = 
-PROVISIONING_PROFILE_SPECIFIER = 
-CODE_SIGN_IDENTITY = -
-CODE_SIGNING_REQUIRED = NO
-CODE_SIGNING_ALLOWED = NO
-EOF
+          echo "CODE_SIGN_STYLE = Manual" >> ios/Flutter/Release.xcconfig
+          echo "DEVELOPMENT_TEAM = " >> ios/Flutter/Release.xcconfig
+          echo "PROVISIONING_PROFILE_SPECIFIER = " >> ios/Flutter/Release.xcconfig
+          echo "CODE_SIGN_IDENTITY = -" >> ios/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_REQUIRED = NO" >> ios/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_ALLOWED = NO" >> ios/Flutter/Release.xcconfig
           echo "=== Release.xcconfig after patch ==="
           cat ios/Flutter/Release.xcconfig
 
