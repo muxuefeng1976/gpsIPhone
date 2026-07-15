@@ -43,11 +43,39 @@ workflows:
       - name: Build IPA (unsigned)
         script: |
           flutter build ios --release --no-codesign
+
+          # 查找生成的 .app 包
+          APP_DIR=$(find build/ios -maxdepth 2 -name "*.app" -type d | head -n 1)
+          echo "Found app bundle: $APP_DIR"
+
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: No .app bundle found in build/ios"
+            find build/ios -type d
+            exit 1
+          fi
+
+          if [ ! -f "$APP_DIR/Info.plist" ]; then
+            echo "ERROR: Info.plist not found in $APP_DIR"
+            ls -la "$APP_DIR"
+            exit 1
+          fi
+
+          # 用 ditto 复制 .app，保留 bundle 结构和资源叉（比 cp -r 更适合 macOS）
+          rm -rf Payload build/ios/ipa
           mkdir -p build/ios/ipa
           mkdir Payload
-          cp -r build/ios/Release-iphoneos/Runner.app Payload/
+          ditto "$APP_DIR" "Payload/$(basename "$APP_DIR")"
+
+          echo "Payload contents:"
+          ls -la Payload/
+          find Payload -maxdepth 2 -type f | head -20
+
+          # 打包成 IPA（确保 zip 根目录是 Payload）
           zip -r build/ios/ipa/gps_iphone.ipa Payload
           rm -rf Payload
+
+          echo "Final IPA contents:"
+          unzip -l build/ios/ipa/gps_iphone.ipa | head -30
 
     artifacts:
       - build/ios/ipa/gps_iphone.ipa
