@@ -14,24 +14,26 @@ workflows:
         script: |
           set -e
           mkdir -p /tmp/ios_bak
-          cp ios/Runner/Info.plist /tmp/ios_bak/Info.plist.bak
-          cp ios/Podfile /tmp/ios_bak/Podfile.bak
-          cp ios/Runner/AppDelegate.swift /tmp/ios_bak/AppDelegate.swift.bak
-          cp ios/Runner/Base.lproj/LaunchScreen.storyboard /tmp/ios_bak/LaunchScreen.storyboard.bak
-          cp ios/Runner/Base.lproj/Main.storyboard /tmp/ios_bak/Main.storyboard.bak
-          cp ios/Flutter/AppFrameworkInfo.plist /tmp/ios_bak/AppFrameworkInfo.plist.bak
-          cp ios/exportOptions.plist /tmp/ios_bak/exportOptions.plist.bak
+
+          # 仅备份用户自定义文件（Podfile 和 AppFrameworkInfo.plist 由 flutter create 生成）
+          cp ios/Runner/Info.plist /tmp/ios_bak/
+          cp ios/Runner/AppDelegate.swift /tmp/ios_bak/
+          cp ios/Runner/Base.lproj/LaunchScreen.storyboard /tmp/ios_bak/
+          cp ios/Runner/Base.lproj/Main.storyboard /tmp/ios_bak/
+          cp ios/exportOptions.plist /tmp/ios_bak/
 
           rm -rf ios
           flutter create . --platforms ios --no-pub
 
-          cp /tmp/ios_bak/Info.plist.bak ios/Runner/Info.plist
-          cp /tmp/ios_bak/Podfile.bak ios/Podfile
-          cp /tmp/ios_bak/AppDelegate.swift.bak ios/Runner/AppDelegate.swift
-          cp /tmp/ios_bak/LaunchScreen.storyboard.bak ios/Runner/Base.lproj/LaunchScreen.storyboard
-          cp /tmp/ios_bak/Main.storyboard.bak ios/Runner/Base.lproj/Main.storyboard
-          cp /tmp/ios_bak/AppFrameworkInfo.plist.bak ios/Flutter/AppFrameworkInfo.plist
-          cp /tmp/ios_bak/exportOptions.plist.bak ios/exportOptions.plist
+          # 恢复自定义文件
+          cp /tmp/ios_bak/Info.plist ios/Runner/Info.plist
+          cp /tmp/ios_bak/AppDelegate.swift ios/Runner/AppDelegate.swift
+          cp /tmp/ios_bak/LaunchScreen.storyboard ios/Runner/Base.lproj/LaunchScreen.storyboard
+          cp /tmp/ios_bak/Main.storyboard ios/Runner/Base.lproj/Main.storyboard
+          cp /tmp/ios_bak/exportOptions.plist ios/exportOptions.plist
+
+          # 给 flutter create 生成的标准 Podfile 添加 iPhone 6s 兼容设置
+          ruby -e 'f=File.read("ios/Podfile"); f.sub!(/(\s+)flutter_additional_ios_build_settings\(target\)\n\1end/) { "#{$1}flutter_additional_ios_build_settings(target)\n#{$1}target.build_configurations.each do |config|\n#{$1}  config.build_settings[\"IPHONEOS_DEPLOYMENT_TARGET\"] = \"12.0\"\n#{$1}  config.build_settings[\"EXCLUDED_ARCHS[sdk=iphonesimulator*]\"] = \"i386\"\n#{$1}  config.build_settings[\"ARCHS\"] = \"arm64\"\n#{$1}end\n#{$1}end" }; File.write("ios/Podfile", f)' || echo "Podfile patch skipped"
 
       - name: Install dependencies
         script: |
