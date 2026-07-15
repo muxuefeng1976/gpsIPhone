@@ -136,8 +136,10 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
 
     // 启动位置流，持续更新
     _positionStream = Geolocator.getPositionStream(
-      desiredAccuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 0,
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 0,
+      ),
     ).listen(
       (Position position) {
         _lastPosition = position;
