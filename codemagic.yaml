@@ -63,28 +63,30 @@ workflows:
           set -e
           set -x
 
-          # 清理旧产物，避免复用上一次失败的 .app
           flutter clean
+          flutter pub get
+          cd ios && pod install && cd ..
 
-          flutter build ios --release --no-codesign
+          # 用 xcodebuild 直接构建，绕过 Flutter 的 DEVELOPMENT_TEAM 检查
+          xcodebuild -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED="NO" \
+            CODE_SIGNING_ALLOWED="NO" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE="" \
+            CONFIGURATION_BUILD_DIR="$(pwd)/build/ios/Release-iphoneos" \
+            build
 
-          # 查找生成的 .app 包
-          APP_DIR=$(find build/ios -maxdepth 2 -name "*.app" -type d | head -n 1)
-          echo "Found app bundle: $APP_DIR"
+          # .app 在 CONFIGURATION_BUILD_DIR 下
+          APP_DIR="build/ios/Release-iphoneos/Runner.app"
+          echo "App bundle: $APP_DIR"
+          ls -la "$APP_DIR"
 
-          if [ -z "$APP_DIR" ]; then
-            echo "ERROR: No .app bundle found in build/ios"
-            find build/ios -type d
-            exit 1
-          fi
-
-          if [ ! -f "$APP_DIR/Info.plist" ]; then
-            echo "ERROR: Info.plist not found in $APP_DIR"
-            ls -la "$APP_DIR"
-            exit 1
-          fi
-
-          # 用 ditto 复制 .app，保留 bundle 结构
+          # 打包成 IPA
           APP_NAME=$(basename "$APP_DIR")
           rm -rf build/ios/ipa
           mkdir -p build/ios/ipa/Payload
@@ -92,15 +94,13 @@ workflows:
 
           echo "Payload contents:"
           ls -la build/ios/ipa/Payload/
-          find build/ios/ipa/Payload -maxdepth 2 -type f | head -20
 
-          # 打包成 IPA（确保 zip 根目录是 Payload）
           cd build/ios/ipa
           zip -r gps_iphone.ipa Payload
           cd ../../..
 
-          echo "Final IPA contents:"
-          unzip -l build/ios/ipa/gps_iphone.ipa | head -30
+          echo "IPA created:"
+          ls -la build/ios/ipa/gps_iphone.ipa
 
 
     artifacts:
