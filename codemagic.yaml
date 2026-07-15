@@ -42,6 +42,12 @@ workflows:
 
       - name: Build IPA (unsigned)
         script: |
+          set -e
+          set -x
+
+          # 清理旧产物，避免复用上一次失败的 .app
+          flutter clean
+
           flutter build ios --release --no-codesign
 
           # 查找生成的 .app 包
@@ -60,22 +66,24 @@ workflows:
             exit 1
           fi
 
-          # 用 ditto 复制 .app，保留 bundle 结构和资源叉（比 cp -r 更适合 macOS）
-          rm -rf Payload build/ios/ipa
-          mkdir -p build/ios/ipa
-          mkdir Payload
-          ditto "$APP_DIR" "Payload/$(basename "$APP_DIR")"
+          # 用 ditto 复制 .app，保留 bundle 结构
+          APP_NAME=$(basename "$APP_DIR")
+          rm -rf build/ios/ipa
+          mkdir -p build/ios/ipa/Payload
+          ditto "$APP_DIR" "build/ios/ipa/Payload/$APP_NAME"
 
           echo "Payload contents:"
-          ls -la Payload/
-          find Payload -maxdepth 2 -type f | head -20
+          ls -la build/ios/ipa/Payload/
+          find build/ios/ipa/Payload -maxdepth 2 -type f | head -20
 
           # 打包成 IPA（确保 zip 根目录是 Payload）
-          zip -r build/ios/ipa/gps_iphone.ipa Payload
-          rm -rf Payload
+          cd build/ios/ipa
+          zip -r gps_iphone.ipa Payload
+          cd ../../..
 
           echo "Final IPA contents:"
           unzip -l build/ios/ipa/gps_iphone.ipa | head -30
+
 
     artifacts:
       - build/ios/ipa/gps_iphone.ipa
