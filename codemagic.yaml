@@ -15,11 +15,9 @@ workflows:
           set -e
           mkdir -p /tmp/ios_bak
 
-          # 仅备份用户自定义文件（Podfile 和 AppFrameworkInfo.plist 由 flutter create 生成）
+          # 仅备份用户自定义文件（Storyboard 不备份，直接用 flutter create 新版避免 Xcode 兼容问题）
           cp ios/Runner/Info.plist /tmp/ios_bak/
           cp ios/Runner/AppDelegate.swift /tmp/ios_bak/
-          cp ios/Runner/Base.lproj/LaunchScreen.storyboard /tmp/ios_bak/
-          cp ios/Runner/Base.lproj/Main.storyboard /tmp/ios_bak/
           cp ios/exportOptions.plist /tmp/ios_bak/
 
           rm -rf ios
@@ -28,8 +26,6 @@ workflows:
           # 恢复自定义文件
           cp /tmp/ios_bak/Info.plist ios/Runner/Info.plist
           cp /tmp/ios_bak/AppDelegate.swift ios/Runner/AppDelegate.swift
-          cp /tmp/ios_bak/LaunchScreen.storyboard ios/Runner/Base.lproj/LaunchScreen.storyboard
-          cp /tmp/ios_bak/Main.storyboard ios/Runner/Base.lproj/Main.storyboard
           cp /tmp/ios_bak/exportOptions.plist ios/exportOptions.plist
 
           # 给 flutter create 生成的标准 Podfile 添加 iPhone 6s 兼容设置
