@@ -28,15 +28,27 @@ workflows:
           cp /tmp/ios_bak/AppDelegate.swift ios/Runner/AppDelegate.swift
           cp /tmp/ios_bak/exportOptions.plist ios/exportOptions.plist
 
-          # 通过 xcconfig 关闭代码签名（--no-codesign 构建未签名 IPA）
-          echo "CODE_SIGN_STYLE = Manual" >> ios/Flutter/Release.xcconfig
-          echo "DEVELOPMENT_TEAM = " >> ios/Flutter/Release.xcconfig
-          echo "PROVISIONING_PROFILE_SPECIFIER = " >> ios/Flutter/Release.xcconfig
-          echo "CODE_SIGN_IDENTITY = -" >> ios/Flutter/Release.xcconfig
-          echo "CODE_SIGNING_REQUIRED = NO" >> ios/Flutter/Release.xcconfig
-          echo "CODE_SIGNING_ALLOWED = NO" >> ios/Flutter/Release.xcconfig
-          echo "=== Release.xcconfig after patch ==="
-          cat ios/Flutter/Release.xcconfig
+          # ---------- 关闭代码签名 ----------
+          # 1) pbxproj：直接改掉 DEVELOPMENT_TEAM / CODE_SIGN_STYLE（优先级最高）
+          PBX_FILE="ios/Runner.xcodeproj/project.pbxproj"
+          sed -i '' -e 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' \
+                    -e 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' \
+                    -e 's/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/PROVISIONING_PROFILE_SPECIFIER = "";/g' \
+                    "$PBX_FILE"
+          echo "=== pbxproj signing patched ==="
+          grep -E 'DEVELOPMENT_TEAM|CODE_SIGN_STYLE|PROVISIONING_PROFILE' "$PBX_FILE" | head -10
+
+          # 2) xcconfig：兜底覆盖所有配置
+          for XCCONF in ios/Flutter/Release.xcconfig ios/Flutter/Debug.xcconfig; do
+            echo "CODE_SIGN_STYLE = Manual" >> "$XCCONF"
+            echo "DEVELOPMENT_TEAM = " >> "$XCCONF"
+            echo "PROVISIONING_PROFILE_SPECIFIER = " >> "$XCCONF"
+            echo "CODE_SIGN_IDENTITY = -" >> "$XCCONF"
+            echo "CODE_SIGNING_REQUIRED = NO" >> "$XCCONF"
+            echo "CODE_SIGNING_ALLOWED = NO" >> "$XCCONF"
+            echo "=== $XCCONF after patch ==="
+            cat "$XCCONF"
+          done
 
           # 给 flutter create 生成的标准 Podfile 添加 iPhone 6s 兼容设置
           ruby -e 'f=File.read("ios/Podfile"); f.sub!(/(\s+)flutter_additional_ios_build_settings\(target\)\n\1end/) { "#{$1}flutter_additional_ios_build_settings(target)\n#{$1}target.build_configurations.each do |config|\n#{$1}  config.build_settings[\"IPHONEOS_DEPLOYMENT_TARGET\"] = \"12.0\"\n#{$1}  config.build_settings[\"EXCLUDED_ARCHS[sdk=iphonesimulator*]\"] = \"i386\"\n#{$1}  config.build_settings[\"ARCHS\"] = \"arm64\"\n#{$1}end\n#{$1}end" }; File.write("ios/Podfile", f)' || echo "Podfile patch skipped"
