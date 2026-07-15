@@ -28,16 +28,17 @@ workflows:
           cp /tmp/ios_bak/AppDelegate.swift ios/Runner/AppDelegate.swift
           cp /tmp/ios_bak/exportOptions.plist ios/exportOptions.plist
 
-          # 关闭自动签名（--no-codesign 需要 Manual 签名 + 空 Team）
-          ruby -e '
-            pbx = "ios/Runner.xcodeproj/project.pbxproj"
-            content = File.read(pbx)
-            content.gsub!(/CODE_SIGN_STYLE = Automatic;/, "CODE_SIGN_STYLE = Manual;")
-            content.gsub!(/DEVELOPMENT_TEAM = .*;/, "DEVELOPMENT_TEAM = \"\";")
-            content.gsub!(/PROVISIONING_PROFILE_SPECIFIER = .*;/, "PROVISIONING_PROFILE_SPECIFIER = \"\";")
-            File.write(pbx, content)
-            puts "Code signing disabled in project.pbxproj"
-          '
+          # 通过 xcconfig 关闭代码签名（--no-codesign 构建未签名 IPA）
+          cat >> ios/Flutter/Release.xcconfig << 'EOF'
+CODE_SIGN_STYLE = Manual
+DEVELOPMENT_TEAM = 
+PROVISIONING_PROFILE_SPECIFIER = 
+CODE_SIGN_IDENTITY = -
+CODE_SIGNING_REQUIRED = NO
+CODE_SIGNING_ALLOWED = NO
+EOF
+          echo "=== Release.xcconfig after patch ==="
+          cat ios/Flutter/Release.xcconfig
 
           # 给 flutter create 生成的标准 Podfile 添加 iPhone 6s 兼容设置
           ruby -e 'f=File.read("ios/Podfile"); f.sub!(/(\s+)flutter_additional_ios_build_settings\(target\)\n\1end/) { "#{$1}flutter_additional_ios_build_settings(target)\n#{$1}target.build_configurations.each do |config|\n#{$1}  config.build_settings[\"IPHONEOS_DEPLOYMENT_TARGET\"] = \"12.0\"\n#{$1}  config.build_settings[\"EXCLUDED_ARCHS[sdk=iphonesimulator*]\"] = \"i386\"\n#{$1}  config.build_settings[\"ARCHS\"] = \"arm64\"\n#{$1}end\n#{$1}end" }; File.write("ios/Podfile", f)' || echo "Podfile patch skipped"
