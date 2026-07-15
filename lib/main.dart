@@ -195,8 +195,7 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
       final response = await http
           .post(
             Uri.parse(_serverUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(body),
+            body: body,
           )
           .timeout(const Duration(seconds: 5));
 
