@@ -58,7 +58,7 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
   void initState() {
     super.initState();
     _getDeviceId();
-    _getInitialPosition();
+    _startGpsStream();
   }
 
   Future<void> _getDeviceId() async {
@@ -105,91 +105,27 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
 
   @override
   void dispose() {
-    _stopTracking();
+    _positionStream?.cancel();
     super.dispose();
   }
 
-  /// 静默获取一次当前位置（已有权限时），不弹权限对话框
-  Future<void> _getInitialPosition() async {
-    try {
-      final status = await Permission.location.status;
-      if (status.isGranted || status.isLimited) {
-        final pos = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-          ),
-        );
-        _lastPosition = pos;
-        setState(() {});
-      }
-    } catch (_) {
-      // 静默失败，不影响用户体验
-    }
-  }
-
-  Future<bool> _requestPermissions() async {
-    // 先请求定位权限
+  /// 启动 GPS 定位流（进页面就开始，按钮只控制是否上传）
+  Future<void> _startGpsStream() async {
+    // 先请求权限
     var locationPermission = await Permission.location.request();
     if (locationPermission.isDenied || locationPermission.isPermanentlyDenied) {
-      // 请求精确位置（iOS 14+）
       locationPermission = await Permission.locationWhenInUse.request();
     }
-
-    if (locationPermission.isGranted || locationPermission.isLimited) {
-      // 检查 GPS 服务是否开启
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() => _status = '请开启 GPS 定位服务');
-        return false;
-      }
-      return true;
-    } else if (locationPermission.isPermanentlyDenied) {
-      setState(() => _status = '定位权限被永久拒绝，请在设置中开启');
-      // 引导用户去设置
-      if (mounted) {
-        _showPermissionDialog();
-      }
-      return false;
+    if (!(locationPermission.isGranted || locationPermission.isLimited)) {
+      setState(() => _status = '定位权限未授权');
+      return;
     }
-    return false;
-  }
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      setState(() => _status = '请开启 GPS 定位服务');
+      return;
+    }
 
-  void _showPermissionDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('需要定位权限'),
-        content: const Text('请在系统设置中允许此应用访问位置信息'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              openAppSettings();
-            },
-            child: const Text('去设置'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _startTracking() async {
-    final hasPermission = await _requestPermissions();
-    if (!hasPermission) return;
-
-    setState(() {
-      _isTracking = true;
-      _status = '正在获取 GPS...';
-      _uploadCount = 0;
-      _failCount = 0;
-      _lastUploadTime = null;
-    });
-
-    // 先获取一次当前位置，让经纬度立刻显示（不等待流推送）
+    // 先拿一次当前位置，立刻显示
     try {
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
@@ -197,12 +133,10 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
         ),
       );
       _lastPosition = pos;
-      setState(() {});
-    } catch (_) {
-      // 获取失败不影响后续流
-    }
+      setState(() => _status = '就绪，等待上传');
+    } catch (_) {}
 
-    // 定位设置：高精度，每5秒更新一次，最小位移0米（每次都更新）
+    // 启动位置流，持续更新
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
       distanceFilter: 0,
@@ -214,23 +148,32 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
             .listen(
       (Position position) {
         _lastPosition = position;
-        // 限制上传频率
-        final now = DateTime.now();
-        if (_lastUploadTime == null ||
-            now.difference(_lastUploadTime!) >= _uploadInterval) {
-          _lastUploadTime = now;
-          _uploadPosition(position);
+        // 如果开启了追踪，才上传
+        if (_isTracking) {
+          final now = DateTime.now();
+          if (_lastUploadTime == null ||
+              now.difference(_lastUploadTime!) >= _uploadInterval) {
+            _lastUploadTime = now;
+            _uploadPosition(position);
+          }
         }
-        if (mounted) {
-          setState(() {});
-        }
+        if (mounted) setState(() {});
       },
       onError: (error) {
-        setState(() => _status = '定位错误: $error');
+        if (mounted) setState(() => _status = '定位错误: $error');
       },
     );
+  }
 
-    setState(() => _status = 'GPS 追踪已启动，每${_uploadInterval.inSeconds}秒上传');
+  Future<void> _startTracking() async {
+    // GPS 流已经在后台运行，这里只需开启上传标记
+    setState(() {
+      _isTracking = true;
+      _uploadCount = 0;
+      _failCount = 0;
+      _lastUploadTime = null;
+      _status = 'GPS 追踪已启动，每${_uploadInterval.inSeconds}秒上传';
+    });
   }
 
   Future<void> _uploadPosition(Position position) async {
@@ -272,11 +215,9 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
   }
 
   void _stopTracking() {
-    _positionStream?.cancel();
-    _positionStream = null;
     setState(() {
       _isTracking = false;
-      _status = '追踪已停止';
+      _status = '已停止上传，GPS 仍在更新';
     });
   }
 
@@ -356,16 +297,7 @@ class _GPSTrackerPageState extends State<GPSTrackerPage> {
                           TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const Divider(),
-                    if (_lastPosition == null && !_isTracking)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Center(
-                          child: Text('点击"开始追踪"获取 GPS 数据',
-                              style: TextStyle(
-                                  fontSize: 14, color: Colors.grey)),
-                        ),
-                      )
-                    else if (_lastPosition == null && _isTracking)
+                    if (_lastPosition == null)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 20),
                         child: Center(
